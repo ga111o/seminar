@@ -254,6 +254,142 @@ $$
 
 ---
 
+### implementation
+
+
+1. SimpleDDPM.init()
+
+- initialize noise scheduling
+
+```python
+def __init__(self, image_size=28, channels=3, timesteps=1000,
+             beta_start=1e-4, beta_end=0.02):
+    
+    # beta linear schedule
+    betas = torch.linspace(beta_start, beta_end, timesteps)
+    
+    alphas = 1 - betas
+    
+    # \bar{\alpha}_t = PI(α_i) from i=1 to t
+    alpha_cumprod = torch.cumprod(alphas, dim=0)
+    
+    # \bar{\alpha}_{t-1} (t-1일 때의 cumulative product)
+    alpha_prev = torch.cat([torch.tensor([1.]), alpha_cumprod[:-1]], dim=0)
+```
+
+2. q_sample()
+
+- Forward Diffusion Process
+
+- generate noise image from random timestep t
+    - x_0 -> x_t
+
+```python
+def q_sample(self, x_start, t):
+    # \sqrt{\bar{\alpha}_t}
+    sa = self.sqrt_alpha_cumprod[t].view(-1,1,1,1)
+    
+    # \sqrt{1-\bar{\alpha}_t}
+    sb = self.sqrt_one_minus_alpha[t].view(-1,1,1,1)
+    
+    # x_t = \sqrt{\bar{\alpha}_t} \cdot x_0 + \sqrt{1-\bar{\alpha}_t} \cdot \varepsilon
+    return sa * x_start + sb * noise
+```
+
+3. p_losses()
+
+- calculate loss func
+
+```python
+def p_losses(self, x_start, t):
+    noise = torch.randn_like(x_start)
+    
+    # add noise at the forward process
+    x_noisy = self.q_sample(x_start, t, noise)
+    
+    # model predict noise 
+    pred_noise = self.model(x_noisy, t)
+    
+    # return the MSE loss results that diffrential between real noise and prediction noise
+    return nn.functional.mse_loss(pred_noise, noise)
+```
+
+4. p_sample()
+
+- reverse diffusion process
+
+- calculate mean of previouse timestep using predicted noise
+
+
+```python
+def p_sample(self, x, t):
+    beta_t = self.betas[t].view(-1,1,1,1)
+    sa_cum = self.sqrt_one_minus_alpha[t].view(-1,1,1,1)  # sqrt{1-\bar{\alpha}_t}
+
+    sr = (1.0 / torch.sqrt(self.alphas[t])).view(-1,1,1,1)  # frac{1}{\sqrt{\alpha_t}}
+    
+    # predict noise
+    eps = self.model(x, t)
+    
+    # calc mean mu_0(x_t, t)
+    mean = sr * (x - beta_t * eps / sa_cum)
+    
+    if t[0] == 0:
+        return mean
+    
+    # calc variance sigma_t^2
+    var = beta_t * (1 - self.alpha_prev[t]) / (1 - self.alpha_cumprod[t])
+    
+    # x_{t-1} = mu_θ(x_t, t) + sigma_t * z, z ~ N(0,I)
+    return mean + torch.sqrt(var).view(-1,1,1,1) * torch.randn_like(x)
+```
+
+5. sample()
+
+- de-noising each step
+
+- call `p_sample()` each step for probabilistic sampling
+
+```python
+def sample(self, batch_size=1):
+    shape = (batch_size, 1, 28, 28)
+    
+    # x_T ~ N(0,I)
+    img = torch.randn(shape, device=device)
+    
+    # T → T-1 → ... → 1 → 0 sequential denoising
+    for i in reversed(range(self.betas.size(0))):
+        t = torch.full((batch_size,), i, dtype=torch.long, device=device)
+        img = self.p_sample(img, t)
+    
+    return img
+```
+
+---
+
+### results
+
+- dataset
+    - mnist dataset
+    - use num `4` (judge to be moderately complex)
+    - number of data used: 5843
+
+![dataset](./img13_mnist_dataset.png)
+
+
+<div style="display: flex; gap: 10px;">
+  <img src="./img11_ddpm_results_epoch10.png" alt="ddpm_result_epoch10" style="width: 100px; height: 100px;">
+  <img src="./img12_ddpm_results_epoch300.png" alt="ddpm_result_epoch300" style="width: 100px; height: 100px;">
+</div>
+
+left: epoch10, loss 0.92
+right: epoch300, loss 0.51
+
+loss converged around 0.5
+
+
+---
+
 
 <!-- 
 
