@@ -12,7 +12,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
 class SimpleDDPM(nn.Module):
-    def __init__(self, image_size=28, channels=3, timesteps=1000,
+    def __init__(self, image_size=28, channels=1, timesteps=1000,
                  beta_start=1e-4, beta_end=0.02):
         super().__init__()
         # Register buffers to stay on correct device automatically
@@ -56,7 +56,7 @@ class SimpleDDPM(nn.Module):
         return mean + torch.sqrt(var).view(-1,1,1,1) * torch.randn_like(x)
 
     def sample(self, batch_size=1):
-        shape = (batch_size, 3, 28, 28)
+        shape = (batch_size, 1, 28, 28)
         img = torch.randn(shape, device=device)
         for i in reversed(range(self.betas.size(0))):
             t = torch.full((batch_size,), i, dtype=torch.long, device=device)
@@ -107,7 +107,7 @@ class ImageFolderDataset(Dataset):
         return len(self.paths)
 
     def __getitem__(self, idx):
-        img = Image.open(self.paths[idx]).convert('RGB')
+        img = Image.open(self.paths[idx]).convert('L')
         return self.transform(img)
 
 def save_image(image, path):
@@ -125,8 +125,12 @@ def save_image(image, path):
     if image.ndim == 4:
         image = image[0]
 
-    # Convert CHW to HWC if necessary
-    if image.shape[0] in (1, 3) and image.ndim == 3:
+    # Handle grayscale images properly
+    if image.shape[0] == 1 and image.ndim == 3:
+        # For grayscale: (1, H, W) -> (H, W)
+        image = image.squeeze(0)
+    elif image.shape[0] == 3 and image.ndim == 3:
+        # For RGB: (3, H, W) -> (H, W, 3)
         image = np.transpose(image, (1, 2, 0))
 
     # Scale to [0,255] and convert to uint8
@@ -135,6 +139,7 @@ def save_image(image, path):
     # Save via PIL
     pil = Image.fromarray(image)
     pil.save(path)
+
 
 
 def train_ddpm(ddpm, loader, epochs=100, lr=1e-4):
@@ -162,14 +167,14 @@ def train_ddpm(ddpm, loader, epochs=100, lr=1e-4):
 
 def main():
     image_size = 28
-    channels = 3
+    channels = 1
     timesteps = 1000
     epochs = 100
-    batch_size = 4
+    batch_size = 128
     learning_rate = 1e-4
     
     dataset = ImageFolderDataset('./images', image_size=28)
-    loader  = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4, pin_memory=True)
+    loader  = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
     print(f"Loaded {len(dataset)} images")
     
     # Initialize DDPM
