@@ -254,10 +254,39 @@ $$
 
 ---
 
+$$
+\textbf{Algorithm 1: Training}
+
+\begin{array}{ll}
+1: & \text{repeat} \\
+2: & \quad x_0 \sim q(x_0) \\
+3: & \quad t \sim \text{Uniform}(\{1, \ldots, T\}) \\
+4: & \quad \epsilon \sim \mathcal{N}(0, I) \\
+5: & \quad \text{Take gradient descent step on } \\
+   & \quad \nabla_\theta \|\epsilon - \epsilon_\theta(\sqrt{\alpha_t} x_0 + \sqrt{1-\alpha_t} \epsilon, t)\|^2 \\
+6: & \text{until converged}
+\end{array}
+$$
+
+$$
+\textbf{Algorithm 2: Sampling}
+
+\begin{array}{ll}
+1: & x_T \sim \mathcal{N}(0, I) \\
+2: & \text{for } t = T, \ldots, 1 \text{ do} \\
+3: & \quad z \sim \mathcal{N}(0, I) \text{ if } t > 1, \text{ else } z = 0 \\
+4: & \quad x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{1-\alpha_t}{\sqrt{1-\alpha_t}} \epsilon_\theta(x_t, t) \right) + \sigma_t z \\
+5: & \text{end for} \\
+6: & \text{return } x_0
+\end{array}
+$$
+
+---
+
 ### implementation
 
 
-1. SimpleDDPM.init()
+1. `SimpleDDPM.init()`
 
 - initialize noise scheduling
 
@@ -277,7 +306,7 @@ def __init__(self, image_size=28, channels=3, timesteps=1000,
     alpha_prev = torch.cat([torch.tensor([1.]), alpha_cumprod[:-1]], dim=0)
 ```
 
-2. q_sample()
+2. `q_sample()`
 
 - Forward Diffusion Process
 
@@ -296,7 +325,7 @@ def q_sample(self, x_start, t):
     return sa * x_start + sb * noise
 ```
 
-3. p_losses()
+3. `p_losses()`
 
 - calculate loss func
 
@@ -314,7 +343,7 @@ def p_losses(self, x_start, t):
     return nn.functional.mse_loss(pred_noise, noise)
 ```
 
-4. p_sample()
+4. `p_sample()`
 
 - reverse diffusion process
 
@@ -344,7 +373,7 @@ def p_sample(self, x, t):
     return mean + torch.sqrt(var).view(-1,1,1,1) * torch.randn_like(x)
 ```
 
-5. sample()
+5. `sample()`
 
 - de-noising each step
 
