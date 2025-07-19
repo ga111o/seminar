@@ -7,7 +7,7 @@
 # Contents
 
 1. Denoising Diffusion Probabilistic Models (DDPM)
-2. DDPM with conditional model
+2. High-Resolution Image Synthesis with Latent Diffusion Models (based on LDM)
 3. Human Motion Diffusion Model (HMD)
 4. SignDiff: Diffusion Model for American Sign Language Production
 5. Introduction to the Research Topic
@@ -145,6 +145,8 @@ $$
 <!-- 예측한 평균과 분산은 추후..? 설명하도록
 
 뒤에 loss 유도 부분에서 -->
+
+<!-- we cant get q(x_t-1|x_t)... so 근사하다(no beautiful) to gausian distribution p_theta(x_t-1|x_t) -->
 
 Complete reverse process:
 $$
@@ -419,337 +421,73 @@ loss converged around 0.5
 
 ---
 
+anyway.. we want to generate image based on Text.
 
-<!-- 
-
-### 2.4 Variational Lower Bound Derivation
-
-The training objective maximizes the log-likelihood:
-$$
-\log p_\theta(x_0) = \log \int p_\theta(x_{0:T}) dx_{1:T}
-$$
-
-Using Jensen's inequality:
-$$
-\log p_\theta(x_0) \geq \mathbb{E}_{q(x_{1:T}|x_0)}[\log \frac{p_\theta(x_{0:T})}{q(x_{1:T}|x_0)}] = -L_{VLB}
-$$
-
-The variational lower bound decomposes as:
-$$
-L_{VLB} = L_T + L_{T-1} + \cdots + L_1 + L_0
-$$
-
-Where:
-- $L_T = D_{KL}(q(x_T|x_0) \| p(x_T))$
-- $L_{t-1} = D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t))$ for $t = 2, \ldots, T$
-- $L_0 = -\log p_\theta(x_0|x_1)$
-
----
-
-## 3. Loss Function Formulation
-
-### 3.1 Simplified Loss Function
-
-The key insight is that we can parameterize the mean as:
-$$
-\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{\beta_t}{\sqrt{1-\bar{\alpha}_t}}\epsilon_\theta(x_t, t)\right)
-$$
-
-This leads to the simplified loss:
-$$
-L_{simple} = \mathbb{E}_{t, x_0, \epsilon}[\|\epsilon - \epsilon_\theta(x_t, t)\|^2]
-$$
-
-Where:
-- $\epsilon \sim \mathcal{N}(0, I)$ is the noise added at timestep $t$
-- $\epsilon_\theta(x_t, t)$ is the predicted noise by the neural network
-- $x_t = \sqrt{\bar{\alpha}_t}x_0 + \sqrt{1-\bar{\alpha}_t}\epsilon$
-
-### 3.2 Weighted Loss Function
-
-The authors propose a weighted version:
-$$
-L_{weighted} = \mathbb{E}_{t, x_0, \epsilon}[w_t \|\epsilon - \epsilon_\theta(x_t, t)\|^2]
-$$
-
-Where the optimal weight is:
-$$
-w_t = \frac{\beta_t^2}{2\sigma_t^2 \alpha_t (1-\bar{\alpha}_t)}
-$$
-
-### 3.3 Connection to Score Matching
-
-The loss function is equivalent to denoising score matching:
-$$
-L_{score} = \mathbb{E}_{t, x_0, \epsilon}[\|\nabla_{x_t} \log q(x_t | x_0) - s_\theta(x_t, t)\|^2]
-$$
-
-Where $s_\theta(x_t, t) = -\frac{\epsilon_\theta(x_t, t)}{\sqrt{1-\bar{\alpha}_t}}$ is the score function.
-
----
-
-## 4. Implementation Details
-
-### 4.1 Network Architecture
-
-**U-Net with Attention**:
-- **Encoder**: Downsampling blocks with ResNet layers
-- **Decoder**: Upsampling blocks with skip connections
-- **Attention**: Multi-head attention at multiple resolutions
-- **Time Embedding**: Sinusoidal positional encoding for timestep $t$
-
-```python
-class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, time_dim=256):
-        super().__init__()
-        self.time_mlp = nn.Sequential(
-            SinusoidalPosEmb(time_dim),
-            nn.Linear(time_dim, time_dim * 4),
-            nn.GELU(),
-            nn.Linear(time_dim * 4, time_dim)
-        )
-        # ... U-Net architecture
-```
-
-### 4.2 Training Algorithm
-
-```python
-def train_step(model, x_0, t, noise_scheduler):
-    # Sample noise
-    noise = torch.randn_like(x_0)
-    
-    # Forward process
-    x_t = noise_scheduler.add_noise(x_0, noise, t)
-    
-    # Predict noise
-    predicted_noise = model(x_t, t)
-    
-    # Compute loss
-    loss = F.mse_loss(predicted_noise, noise)
-    
-    return loss
-```
-
-### 4.3 Sampling Algorithm
-
-```python
-def sample(model, shape, num_steps, noise_scheduler):
-    x = torch.randn(shape)
-    
-    for i in reversed(range(num_steps)):
-        t = torch.full((shape[0],), i, dtype=torch.long)
-        
-        # Predict noise
-        predicted_noise = model(x, t)
-        
-        # Denoise step
-        x = noise_scheduler.step(predicted_noise, t, x)
-    
-    return x
-```
-
----
-
-## 5. Noise Schedules
-
-### 5.1 Linear Schedule
-$$
-\beta_t = \beta_1 + \frac{t-1}{T-1}(\beta_T - \beta_1)
-$$
-
-### 5.2 Cosine Schedule
-$$
-\bar{\alpha}_t = \frac{f(t)}{f(0)}, \quad f(t) = \cos\left(\frac{t/T + s}{1 + s} \cdot \frac{\pi}{2}\right)^2
-$$
-
-### 5.3 Improved Schedules
-Recent work shows that carefully designed schedules can significantly improve performance:
-- **Cosine schedule**: Better for small datasets
-- **Learned schedules**: Optimized during training
-- **Adaptive schedules**: Adjust based on model confidence
-
----
-
-## 6. Datasets and Experimental Results
-
-### 6.1 Primary Datasets
-
-**CIFAR-10**:
-- 32×32 RGB images
-- 10 classes, 50,000 training images
-- **Results**: FID 3.17, IS 9.46
-
-**LSUN**:
-- High-resolution images (256×256)
-- Multiple categories (bedrooms, churches, towers)
-- **Results**: Sample quality comparable to ProgressiveGAN
-
-**CelebA-HQ**:
-- 256×256 celebrity faces
-- 30,000 high-quality images
-- **Results**: State-of-the-art face generation
-
-### 6.2 Evaluation Metrics
-
-**Frechet Inception Distance (FID)**:
-$$
-FID = \|\mu_r - \mu_g\|^2 + \text{Tr}(\Sigma_r + \Sigma_g - 2(\Sigma_r \Sigma_g)^{1/2})
-$$
-
-**Inception Score (IS)**:
-$$
-IS = \exp(\mathbb{E}_{x \sim p_g} D_{KL}(p(y|x) \| p(y)))
-$$
+For this, **Latent Diffusion Model** is used
 
----
+| High-Resolution Image Synthesis with Latent Diffusion Models (Robin Rombach et al., 2021)
 
-## 7. Text-to-Image Generation
+![catcat](./img14_latent_diffusion_model.png)
 
-### 7.1 Conditioning Mechanism
+![structure](./img15_lat222.png)
 
-To enable text-to-image generation, DDPM can be extended with conditioning:
 
-$$
-p_\theta(x_{t-1} | x_t, c) = \mathcal{N}(x_{t-1}; \mu_\theta(x_t, t, c), \Sigma_\theta(x_t, t, c))
-$$
+### Training Steps
 
-Where $c$ is the text condition.
+0. Dataset Preparation (image-text pairs)
 
-### 7.2 Classifier Guidance
+1. Image Encoding (Pixel Space → Latent Space)
+   - Convert image $x$ to low-dimensional latent space $z$ through VAE encoder
+   - Compress semantic bits to improve computational efficiency
 
-**Classifier-Guided Sampling**:
-$$
-\epsilon_\theta(x_t, t, c) = \epsilon_\theta(x_t, t) + s \cdot \nabla_{x_t} \log p_\phi(c | x_t)
-$$
+2. Text Encoding & Conditioning
+   - Convert text into embeddings
+   - Prepare semantic maps and text representations as conditional inputs
 
-Where:
-- $s$ is the guidance scale
-- $p_\phi(c | x_t)$ is a classifier trained on noisy images
+3. Noise Addition
+   - Add Gaussian noise to latent representation $z$
+   - Apply noise scheduling according to timestep $T$
 
-### 7.3 Classifier-Free Guidance
+4. Noise Prediction (Denoising U-Net)
+   - U-Net predicts noise $e_\theta$ under text conditioning
+   - Fuse text-image information through cross-attention mechanism with $Q, K, V$ operations
+   $$
+   \mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+   $$
 
-**Unconditional + Conditional Training**:
-$$
-\tilde{\epsilon}_\theta(x_t, t, c) = \epsilon_\theta(x_t, t) + s \cdot (\epsilon_\theta(x_t, t, c) - \epsilon_\theta(x_t, t))
-$$
+   -> 일반적인 cross attention에 $\varphi_i(z_t)$와 $\varphi_i(z_t)$를 dot product한 것으로 구현
+   
+   <!-- each element값 << 해당 image position이 해당 text token에 얼마나 주목해야 하는지를 나타내는 weight -->
 
-This approach trains a single model for both conditional and unconditional generation.
+    $$
+    Q = W_Q^{(i)} \cdot \underbrace{\varphi_i(z_t)}_{\text{latent representation}}
+    $$
 
-### 7.4 Text Encoding
+    $$
+    \quad K = W_K^{(i)} \cdot \underbrace{\tau_\theta(y)}_{\text{Mapping for conditional data}}
+    $$
 
-**CLIP Text Encoder**:
-- Transformer-based text encoder
-- Maps text to embedding space
-- Cross-attention in U-Net layers
+    $$
+    \quad V = W_V^{(i)} \cdot \tau_\theta(y)
+    $$
 
-```python
-class TextConditionedUNet(nn.Module):
-    def __init__(self, text_dim=512):
-        super().__init__()
-        self.text_encoder = CLIPTextEncoder()
-        self.cross_attention = CrossAttention(text_dim)
-        
-    def forward(self, x, t, text):
-        text_emb = self.text_encoder(text)
-        x = self.cross_attention(x, text_emb)
-        return self.unet(x, t)
-```
+    <!-- 
+    역할 of \tau <<< condition's embedding to D(차원의) vector
+    input: [[0.1, 0.3, 0.2], [0.5, 0.2, 0.4], [0.3, 0.1, 0.6], ...]
+    output: [0.3, 0.2, 0.4] (Mean Pooling)
+    -->
 
----
+5. Loss Calculation
+   - Minimize difference between predicted noise and actual noise
 
-## 8. Advanced Topics
+    $$
+    \mathcal{L} = \mathbb{E}_{z_0, \epsilon \sim \mathcal{N}(0,I), t, c} \left[ \|\epsilon - \epsilon_\theta(z_t, t, \tau_\theta(y))\|^2 \right]
+    $$
 
-### 8.1 Latent Diffusion Models
 
-**Latent Space Diffusion**:
-- Apply diffusion in latent space instead of pixel space
-- Use VAE encoder/decoder
-- Significantly reduces computational cost
+   - Calculate MSE loss in latent space
 
-$$
-z_t = \sqrt{\bar{\alpha}_t}z_0 + \sqrt{1-\bar{\alpha}_t}\epsilon
-$$
+6. Image Decoding (Latent Space → Pixel Space)
+   - Restore latent representation $z_T$ to pixel space $\tilde{x}$ through VAE decoder
+   - Final image generation and quality verification
 
-### 8.2 Improved Sampling
-
-**DDIM (Denoising Diffusion Implicit Models)**:
-- Deterministic sampling process
-- Faster generation (10-50 steps vs 1000)
-- Non-Markovian process
-
-**DPM-Solver**:
-- Numerical ODE solver for diffusion
-- Even faster sampling
-- Maintains high quality
-
-### 8.3 Applications Beyond Images
-
-**Audio Generation**:
-- WaveGrad: Audio waveform generation
-- Diffusion models for speech synthesis
-
-**3D Generation**:
-- Point cloud generation
-- 3D shape synthesis
-
-**Video Generation**:
-- Temporal consistency
-- Video diffusion models
-
----
-
-## 9. Theoretical Connections
-
-### 9.1 Stochastic Differential Equations
-
-The continuous-time limit of DDPM is an SDE:
-$$
-dx = f(x, t)dt + g(t)dw
-$$
-
-Where $f(x, t)$ is the drift and $g(t)$ is the diffusion coefficient.
-
-### 9.2 Score-Based Generative Models
-
-Connection to score-based models:
-$$
-\nabla_{x_t} \log q(x_t) = -\frac{\epsilon_\theta(x_t, t)}{\sqrt{1-\bar{\alpha}_t}}
-$$
-
-### 9.3 Optimal Transport
-
-Recent work connects diffusion models to optimal transport theory, providing new insights into the generation process.
-
----
-
-## 10. Limitations and Future Directions
-
-### 10.1 Current Limitations
-
-1. **Slow Sampling**: Requires many denoising steps
-2. **Computational Cost**: High memory and compute requirements
-3. **Limited Control**: Difficulty in fine-grained control
-4. **Mode Coverage**: Potential mode collapse in some cases
-
-### 10.2 Future Directions
-
-1. **Faster Sampling**: Improved numerical solvers
-2. **Better Conditioning**: More sophisticated control mechanisms
-3. **Multimodal Generation**: Text, audio, video integration
-4. **Theoretical Understanding**: Better mathematical foundations
-
----
-## 11. Conclusion
-
-DDPM represents a fundamental breakthrough in generative modeling:
-
-- **Theoretical Rigor**: Strong mathematical foundations
-- **Practical Success**: State-of-the-art results across domains
-- **Broad Impact**: Influenced numerous follow-up works
-- **Future Potential**: Continues to drive innovation in AI
-
-The combination of non-equilibrium thermodynamics, score matching, and deep learning has created a powerful framework for generation that continues to evolve and improve.
-
-
-
--->
