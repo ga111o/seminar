@@ -432,6 +432,8 @@ For this, **Latent Diffusion Model** is used
 ![structure](./img15_lat222.png)
 
 
+<!-- switch << tau에서 나온 이미지가 z_t에 concatenation되어서 들감 // 굳이 왜 나눔?? <<< z_t랑 tau랑 크기가 같아야한다 << to emphasize this? idontknowwhattheheckisthisfreakingfigure.. -->
+
 ### Training Steps
 
 0. Dataset Preparation (image-text pairs)
