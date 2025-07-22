@@ -1,15 +1,18 @@
 # Diffusion Model-Based Sign Language Generation
 
-> IDEA Lab | 강민혁
+### DDPM to SignDiff
+
+> IDEA Lab | 강민혁  
+> 2025.07.23
 
 ---
 
 # Contents
 
-1. Denoising Diffusion Probabilistic Models (DDPM)
-2. High-Resolution Image Synthesis with Latent Diffusion Models (based on LDM)
+1. Denoising Diffusion Probabilistic Models (DDPM) <!-- 얘는 논문리뷰 느낌 -->
+2. High-Resolution Image Synthesis with Latent Diffusion Models (LDM) <!-- 나머지는 논문리뷰라기보단.. 뭐라고 하지.. -->
 3. Human Motion Diffusion Model (HMD)
-4. SignDiff: Diffusion Model for American Sign Language Production
+4. SignDiff: Diffusion Model for American Sign Language Production <!-- 얘도 논문리뷰 느낌으로 가야하긴 해야할지도 -->
 5. Introduction to the Research Topic
 
 ---
@@ -425,7 +428,7 @@ anyway.. we want to generate image based on Text.
 
 For this, **Latent Diffusion Model** is used
 
-| High-Resolution Image Synthesis with Latent Diffusion Models (Robin Rombach et al., 2021)
+> High-Resolution Image Synthesis with Latent Diffusion Models (Robin Rombach et al., 2021)
 
 ![catcat](./img14_latent_diffusion_model.png)
 
@@ -491,5 +494,199 @@ For this, **Latent Diffusion Model** is used
 
 6. Image Decoding (Latent Space → Pixel Space)
    - Restore latent representation $z_T$ to pixel space $\tilde{x}$ through VAE decoder
-   - Final image generation and quality verification
+   - Final image generHDMation and quality verification
+
+---
+
+### Motion Diffusion
+
+> Human Motion Diffusion Model  (Tevet et al., 2023)
+
+![motion diffusion](./img16_mdm.png)
+
+Purpose: Synthesize a human motion $x_{1:N}$ of length $N$ from a given arbitrary condition $c$.
+
+-> Generate 1 to N frames instead of one frame (one frame)
+
+-> Use Diffusion Architecture instead of U-Net
+
+In this case, the condition $c$ can be audio, natural language (text-to-motion), etc.
+
+<!-- of course.. 그에 맞는 embedding은 알아서 -->
+
+Of course, it is also possible to generate unconditional motion, which can be represented by the null condition $c = \emptyset$.
+
+- 입력: $\emptyset$  
+    - output1: 걷기 -> 멈춤 -> 손 흔들기  
+    - output2: 뛰기 -> 돌기 -> 앉기
+    - output3: ...
+
+생성된 모션 $\mathbf{x}_{1:N} = \{ \mathbf{x}^i \}_{i=1}^N$은 $\mathbf{x}_i \in \mathbb{R}^{J \times D}$로 표현되는 인간의 포즈.
+
+- $N$: number of frame
+- $J$: number of joints
+- $D$: joint representation
+
+In the paper, author? they? << 일반적으로 뭐라고 칭하는지 확인 필요 used dataset with the values below([HumanML3D](https://ericguo5513.github.io/text-to-motion/Poster_CVPR2022.pdf)), where $D$ includes the joint's position, rotation, and velocity.
+
+<!-- It consists of 14,616 motions and 44,970 textual descriptions composed by 5,371 distinct words. -->
+- joint positions
+
+- joint velocities
+
+- joint rotations
+
+
+![mdmdataset](./img18_mdm_dataset.png)
+
+
+For sequential behavior, it is necessary to learn and predict the entire motion sequence at once.
+
+$\hat{\mathbf{x}}_0 = \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c})$에서:
+
+<!-- $\hat{\mathbf{x}}_0$  전체 모션 시퀀스 $\mathbf{x}_{1:N}$를 뜻한다고 그냥 해도 되려나 -->
+
+-> predict all frames in one reserve pass
+
+---
+
+<!-- ![hmd..사실은PhysDiff꺼긴한데그냥쓰죠](./img17_humanmotiongen.png) -->
+![motion diffusion](./img16_mdm.png)
+
+MDM'nn = $\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c})$
+
+$$
+\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c}) = \text{Transformer}_\theta(\mathbf{E}_t, \mathbf{E}_c, \mathbf{E}_{pos})
+$$
+
+$\mathbf{E}_t$: noise motion embedding
+
+$\mathbf{E}_c$: condition information embedding
+
+$\mathbf{E}_{pos}$: position embedding
+
+1. motion embedding $\mathbf{E}_t$
+    - $\mathbf{x}_t \in \mathbb{R}^{N \times (J \times D)}$ <!-- noised motion x_1:t--> <!-- x_t는 J by D가 N만큼의 프레임이 있는 실수 차원에 속한다 -->
+
+    - $\mathbf{E}_t = \text{Linear}_{\text{motion}}(\mathbf{x}_t) + \text{TimeEmbedding}(t)$ <!-- Linear Transformation Function --> = $\mathbb{R}^{N \times d_{\text{model}}}$
+
+<br/>
+
+2. time step embedding
+
+    <!-- $$
+    \text{TimeEmbedding}(t) = \text{MLP}(\text{SinusoidalEncoding}(t))
+    $$ -->
+    <!-- 정현파 인코딩 // /ˌsaɪnəˈsɔɪdəl/ encoding-->
+    - $\text{TimeEmbedding}(t) = \text{SinusoidalEncoding}(t)$
+
+<br/>
+
+3. conditional embedding $\mathbf{E}_c$
+    - $\mathbf{E}_c = \text{CLIP}_{\text{encoder}}(\mathbf{c})$
+
+<br/>
+
+4. positional embedding $\mathbf{E}_{pos}$
+    - $\mathbf{E}_{pos} = \text{LearnablePositionalEncoding}[1:N]$
+
+<br/>
+
+<!-- 
+멀티헤드셀프어텐션です。。이건
+
+each transformer 레이어에서
+
+$$
+\text{MultiHead}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{Concat}(\text{head}_1, ..., \text{head}_h)\mathbf{W}^O
+$$
+
+each attention head
+
+$$
+\text{head}_i = \text{Attention}(\mathbf{Q}\mathbf{W}_i^Q, \mathbf{K}\mathbf{W}_i^K, \mathbf{V}\mathbf{W}_i^V)
+$$
+
+$$
+\text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{softmax}\left(\frac{\mathbf{Q}\mathbf{K}^T}{\sqrt{d_k}}\right)\mathbf{V}
+$$
+
+크로스-어텐션-컨디셔널에서
+
+인터렉션 비트윈 every token - conditional toekn
+
+$$
+\mathbf{H}' = \text{CrossAttention}(\mathbf{H}_{\text{motion}}, \mathbf{E}_c, \mathbf{E}_c)
+$$
+
+
+$\mathbf{Q} = \mathbf{H}_{\text{motion}}\mathbf{W}^Q$ motion에서 -
+
+$\mathbf{K} = \mathbf{V} = \mathbf{E}_c\mathbf{W}^{K,V}$ condition에서 --
+
+feed-forward network
+
+$$
+\text{FFN}(\mathbf{x}) = \text{Linear}_2(\text{ReLU}(\text{Linear}_1(\mathbf{x})))
+$$
+
+
+요로코롬해서 we can get complete transformer layer❕
+
+each layer $l$에서:
+
+$$
+\mathbf{H}^{(l)} = \text{LayerNorm}(\mathbf{H}^{(l-1)} + \text{MultiHead}(\mathbf{H}^{(l-1)}))
+$$
+
+$$
+\mathbf{H}^{(l)} = \text{LayerNorm}(\mathbf{H}^{(l)} + \text{CrossAttention}(\mathbf{H}^{(l)}, \mathbf{E}_c))
+$$
+
+$$
+\mathbf{H}^{(l)} = \text{LayerNorm}(\mathbf{H}^{(l)} + \text{FFN}(\mathbf{H}^{(l)}))
+$$
+
+output projection
+
+final output transform original motion dimm using? based on? linear projection
+
+$$
+\hat{\mathbf{x}}_0 = \text{Linear}_{\text{out}}(\mathbf{H}^{(L)})
+$$
+
+conditional <<<< 
+$$
+\tilde{\boldsymbol{\epsilon}}_\theta(\mathbf{x}_t, t, \mathbf{c}) = \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \emptyset) + s \cdot (\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c}) - \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \emptyset))
+$$
+
+$s$ << guidance scale params
+
+gpt피셜 $s$는 0.25에서 0.75 사이에서 주로 사용 // 0.75 주로 사용,,, 진짜인지는 ㅁ?ㄹ.. 0.75로했다는레퍼런스는못찾아버린..
+
+->
+$$
+\begin{align}
+\mathbf{E}_{\text{input}} &= \text{Linear}_{\text{motion}}(\mathbf{x}_t) + \text{TimeEmbedding}(t) + \mathbf{E}_{pos} \\
+\mathbf{H}^{(0)} &= \mathbf{E}_{\text{input}} \\
+\mathbf{H}^{(l)} &= \text{TransformerLayer}^{(l)}(\mathbf{H}^{(l-1)}, \mathbf{E}_c) \quad \forall l \in [1, L] \\
+\hat{\mathbf{x}}_0 &= \text{Linear}_{\text{out}}(\mathbf{H}^{(L)})
+\end{align}
+$$
+
+0.015정도 이해해버렸을지도..? 
+-->
+
+
+---
+
+mdm 학습 과정 마무리
+
+---
+
+mdm sampling 부분
+
+![mdmkickback](./img19_mdmkickback.mp4)
+
+---
 
