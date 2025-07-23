@@ -171,7 +171,6 @@ $$
 
 #### We want to..
 
-<!-- 원본 데이터인 x_0가 나타날 (log) likelihood 최대화 -->
 $$
 \underset{\theta}{\operatorname{arg\,max}} \log p_{\theta}(x_0)
 $$
@@ -183,11 +182,22 @@ $$
 
 But.. this integral must be consider any combinations of latent variables
 
--> Derive ELBO using Jensen's Inequality
+-> get ELBO using Jensen's Inequality
+
+<!-- ![옌센?젠센?뭐라고불러야하죠..ipa피셜 덴마크사람이니 /ˈyensənz/이라 불러야 한다네요](./img22_jensen.png)
+
+Jensen's Inaquality -->
 
 ---
 
-<!-- 로그가 적분 바깥에 있지 않으니 jensen's inequality 불가 -->
+<samll>
+
+$$
+f(\mathbb{E}[X]) \geq \mathbb{E}[f(X)]
+$$
+
+</small>
+
 $$
 log(p(x_0)) = \int p(x_{0:T})dx_{1:T}
 $$
@@ -204,13 +214,7 @@ $$
 \log p(x_0) = \log \left( \mathbb{E}_{q(x_{1:T} \mid x_0)} \left[ \frac{p(x_{0:T})}{q(x_{1:T} \mid x_0)} \right] \right)
 $$
 
-<samll>
 
-$$
-f(\mathbb{E}[X]) \geq \mathbb{E}[f(X)]
-$$
-
-</small>
 
 
 <!-- 오른쪽 항 최대화 -> 실제 데이터 분포-->
@@ -238,7 +242,6 @@ minimizes the divergence between $q(x_{t-1})$ and $p_\theta(x_{t-1})$
 
 ---
 
-### 적당한소제목
 
 $$
 L_{t-1} = D_{\mathrm{KL}}\left(q(x_{t-1} \mid x_t, x_0) \,\|\, p_\theta(x_{t-1} \mid x_t)\right)
@@ -248,7 +251,11 @@ $$
 $$
 = \mathbb{E}_q \left[ \frac{2\sigma_t^2}{1} \left\| \tilde{\mu}_t(x_t, x_0) - \mu_\theta(x_t, t) \right\|^2 \right] + C
 $$
-<br/><br/>
+<br/>
+
+$$\tilde{\mu}_t = \frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\boldsymbol{\epsilon}\right)$$
+
+
 
 <!-- e(x_t, t) noise 데이터에서 모델이 예측한 노이즈 -->
 $$
@@ -261,7 +268,7 @@ L_{t-1} = \mathbb{E}_{\mathbf{x}_0 \sim q(\mathbf{x}_0), \epsilon \sim \mathcal{
 
 $$
 
--> **only the noise prediction** gives the final loss
+-> now, we can predict noise
 
 
 ---
@@ -431,7 +438,9 @@ loss converged around 0.5
 
 ---
 
-anyway.. we want to generate image based on Text.
+anyway.. we can generate an new image with an image
+
+but,, we want to generate image based on Text.
 
 For this, **Latent Diffusion Model** is used
 
@@ -462,7 +471,7 @@ For this, **Latent Diffusion Model** is used
 
 4. Noise Prediction (Denoising U-Net)
    - U-Net predicts noise $e_\theta$ under text conditioning
-   - Fuse text-image information through cross-attention mechanism with $Q, K, V$ operations
+   - combine text-image information through cross-attention mechanism with $Q, K, V$ operations
    $$
    \mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
    $$
@@ -528,7 +537,7 @@ Of course, it is also possible to generate unconditional motion, which can be re
     - output2: 뛰기 -> 돌기 -> 앉기
     - output3: ...
 
-생성된 모션 $\mathbf{x}_{1:N} = \{ \mathbf{x}^i \}_{i=1}^N$은 $\mathbf{x}_i \in \mathbb{R}^{J \times D}$로 표현되는 인간의 포즈.
+생성된 모션 $\mathbf{x}_{1:N} = \{ \mathbf{x}^i \}_{i=1}^N$은 $\mathbf{x}_i \in \mathbb{R}^{J \times D}$로 표현되는 인간의 포즈
 
 - $N$: number of frame
 - $J$: number of joints
@@ -549,11 +558,11 @@ In the paper, author? they? << 일반적으로 뭐라고 칭하는지 확인 필
 
 For sequential behavior, it is necessary to learn and predict the entire motion sequence at once.
 
-$\hat{\mathbf{x}}_0 = \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c})$에서:
+$\hat{\mathbf{x}}_0 = \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c})$에서
 
 <!-- $\hat{\mathbf{x}}_0$  전체 모션 시퀀스 $\mathbf{x}_{1:N}$를 뜻한다고 그냥 해도 되려나 -->
 
--> predict all frames in one reserve pass
+-> predict all frames in one reverse process
 
 ---
 
@@ -573,7 +582,7 @@ $\mathbf{E}_c$: condition information embedding
 $\mathbf{E}_{pos}$: position embedding
 
 1. motion embedding $\mathbf{E}_t$
-    - $\mathbf{x}_t \in \mathbb{R}^{N \times (J \times D)}$ <!-- noised motion x_1:t--> <!-- x_t는 J by D가 N만큼의 프레임이 있는 실수 차원에 속한다 -->
+    - $\mathbf{x}_t \in \mathbb{R}^{N \times (J \times D)}$ <!-- noised motion x_1:t--> 
 
     - $\mathbf{E}_t = \text{Linear}_{\text{motion}}(\mathbf{x}_t) + \text{TimeEmbedding}(t)$ <!-- Linear Transformation Function --> = $\mathbb{R}^{N \times d_{\text{model}}}$
 
@@ -640,7 +649,7 @@ $$
 
 요로코롬해서 we can get complete transformer layer❕
 
-each layer $l$에서:
+each layer $l$에서
 
 $$
 \mathbf{H}^{(l)} = \text{LayerNorm}(\mathbf{H}^{(l-1)} + \text{MultiHead}(\mathbf{H}^{(l-1)}))
@@ -698,7 +707,7 @@ $$
 \right]
 $$
 
-![mdmkickback](./img19_mdmkickback.mp4)
+![motion diffusion](https://github.com/GuyTevet/mdm-page/raw/main/static/figures/dip_vis_caption_small.gif)
 
 <!--https://guytevet.github.io/mdm-page/-->
 
@@ -722,7 +731,7 @@ $$
 물론, [Quandt LC (2022)](https://pmc.ncbi.nlm.nih.gov/articles/PMC8866438/)와 같이 수어모델 효용성에 대한 연구가 진행되긴 했음.
 하지만, 해당 연구에서 사용한 computer-generated 수어는 키프레임 직접 찍어서 애니메이션을 생성하거나, 모션캡쳐.
 
-    - 연구에서 "아바타의 외모"가 수용자의 수용에 큰 영향을 끼친다고도 함. (저자들은 Uncanny Valley가 존재한다고 판단.)
+- 연구에서 "아바타의 외모"가 수용자의 수용에 큰 영향을 끼친다고도 함. (저자들은 Uncanny Valley가 존재한다고 판단.)
 
 ![dma..](./img20_signlanguage.png)
 
@@ -750,9 +759,9 @@ World Federation of Deaf는 수어모델에 대해 [아래와 같은 주의사�
 
 -> 
 
-    1. 위의 물음에도 답하며, 
+1. 위의 물음에도 답하며, 
 
-    2. 다양한 맥락에서 통역사 / (3d모델)아바타 / 현실감 있는 생성된 동영상 의 효과성 비교
+2. 다양한 맥락에서 통역사 / (3d모델)아바타 / 현실감 있는 생성된 동영상 의 효과성 비교
 
 
 -> 기술적인 발전이 인간을 앞서가는.. 그러한 격차를 해결하는 것이 궁극적인 목표.
