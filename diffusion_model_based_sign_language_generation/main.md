@@ -9,10 +9,10 @@
 
 # Contents
 
-1. Denoising Diffusion Probabilistic Models (DDPM) <!-- 얘는 논문리뷰 느낌 -->
+1. Denoising Diffusion Probabilistic Models (DDPM) 
 2. High-Resolution Image Synthesis with Latent Diffusion Models (LDM) <!-- 나머지는 논문리뷰라기보단.. 뭐라고 하지.. -->
-3. Human Motion Diffusion Model (HMD)
-4. SignDiff: Diffusion Model for American Sign Language Production <!-- 얘도 논문리뷰 느낌으로 가야하긴 해야할지도 -->
+3. Human Motion Diffusion Model (MDM)
+4. Recently proposed sign language models
 5. Introduction to the Research Topic
 
 ---
@@ -29,7 +29,14 @@
 
 ### Key Advantages
 1. **High-Quality Generation**: Produces remarkably realistic images
+
+    ![realistic](./img21_generationed_ddpm.png)
+
+    - Generated samples on CelebA-HQ 256 × 256
+
 2. **Training Stability**: No adversarial training, more stable convergence
+<!-- gan << loss가 큰 폭으로 움직임 -->
+
 3. **Theoretical Rigor**: Strong mathematical foundations
 4. **Controllability**: Natural progressive generation process
 5. **Flexibility**: Can be applied to various data types (images, audio, text)
@@ -498,7 +505,7 @@ For this, **Latent Diffusion Model** is used
 
 ---
 
-### Motion Diffusion
+## Motion Diffusion
 
 > Human Motion Diffusion Model  (Tevet et al., 2023)
 
@@ -680,13 +687,73 @@ $$
 
 ---
 
-mdm 학습 과정 마무리
-
----
-
-mdm sampling 부분
+$$
+\mathcal{L}_{\text{simple}} =
+\mathbb{E}_{\mathbf{x}_0, t, \boldsymbol{\epsilon}}
+\left[
+\left\|
+\boldsymbol{\epsilon} -
+\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c})
+\right\|_2^2
+\right]
+$$
 
 ![mdmkickback](./img19_mdmkickback.mp4)
 
+<!--https://guytevet.github.io/mdm-page/-->
+
 ---
+
+## Recently proposed sign language models
+
+| 연구명/모델명 | 메커니즘 | 작동 방식 | 특징 | input | output | dataset | 성능/논문에서자랑하는것들 | limitation |
+|---|---|---|---|---|---|---|---|---|
+| Neural Sign Actors: A diffusion model for 3D sign language production from text (2024) | Diffusion Model + SMPL-X | conditional diffusion 모델,, SMPL-X(3d인체모델) pose space에서 저차원 nosie를 점진적 추가 후 제거. | generate realistic sign language avata based on 3d mesh, based on ASL dataset | eng text | 3d anime avata | How2Sign (skeleton(sequence of keypoints extracted from OpenPose) to video) | 기존 SLP 방법론들보다 상당히 좋음 | 계산비용문제 |
+| Advanced Sign Language Video Generation with Compressed and Quantized Multi-Condition Tokenization (2024) | Multi-Condition Diffusion + FSQ Autoencoder | 고차원 condition을 직접 사용하는 대신, 이산 토큰화 사용,,, stable diffusion기반한다고는 하는데 더 자세히 알아볼 필요 있음. | multi condition | voice & text | video | RWTH-2014T(독일수화데이터셋), How2Sign  | sota, Temporal Coherence상당히 좋음 | 계상비용문제 & 다중언어한계 |
+| SignDiff: Diffusion Model for American Sign Language Production (2024) | Conditional Diffusion Model | mdm기반모델로 skeleton 생성 -> how2sign으로 이미지 생성 | 복잡한 수어 동작 표현 가능 | text | eng sign lang | How2Sign | sota, 자연스러운..? 손동작 표현 | 계산비용문제 & 다중언어한계 |
+
+
+---
+
+## Introduction to the Research Topic
+
+대부분의 수어 생성 연구는 데이터셋 기반 기술적 지표에 주로 초점을 맞춤. 실제 효용성과 사용자 수용도 평가보다는.
+
+물론, [Quandt LC (2022)](https://pmc.ncbi.nlm.nih.gov/articles/PMC8866438/)와 같이 수어모델 효용성에 대한 연구가 진행되긴 했음.
+하지만, 해당 연구에서 사용한 computer-generated 수어는 키프레임 직접 찍어서 애니메이션을 생성하거나, 모션캡쳐.
+
+    - 연구에서 "아바타의 외모"가 수용자의 수용에 큰 영향을 끼친다고도 함. (저자들은 Uncanny Valley가 존재한다고 판단.)
+
+![dma..](./img20_signlanguage.png)
+
+<br/>
+
+[Neural Sign Actors](https://arxiv.org/html/2312.02702v2)와 같이 생성형 모델에 대해서 user study를 진행한 경우도 있지만, 수어모델 자체의 타당성보다는 기술적 성과가 주가 됨.
+
+-> 모델들이 실제로 농인(청각장애인) 및 난청인들이 이러한 모델이 생성한 수어를 어떻게 바라보는지에 대해 실증적인 연구가 필요함.
+
+World Federation of Deaf는 수어모델에 대해 [아래와 같은 주의사항](https://wasli.org/wp-content/uploads/2023/07/WFD-and-WASLI-Statement-on-Avatar-FINAL-14032018-Updated-14042018-1.pdf)을 보임.
+
+1. Direct word–for-sign translations often do not exist. Achieving equivalence relies on more than just lexical word-sign matches. Any translation or interpretation must consider how to convey the message in terms of the lexicon (words/signs), grammar (structure), semantics (meaning) and discourse (language use).
+
+    - 단순히 단어->수화가 아닌, 언어->언어인데, 문제 없는가?
+
+2. Translators and interpreters take time to prepare in order to fully understand a message and to give consideration to their target audience. An automated translation will not be able to take other sociolinguistic and sociocultural factors into account in order to ensure that the intent of the message sender, and the goals of the message receiver, are achieved.
+
+    - 의도와 맥락까지 표현 가능한가? 
+
+3. Collections of online sign language dictionaries are still emerging and do not contain full digitised corpus of possible signs (including variants stemming from different socio-linguistic categories), therefore there is not the digital resource available for generating signed statements by avatars.
+
+    - 아직 수어 사전(데이터셋)이 완전하지 않다는 한계가 존재함에도 문제가 없는가?
+
+4. Avatars provide a one way communication channel only from spoken to sign language and not vice versa.
+
+-> 
+
+    1. 위의 물음에도 답하며, 
+
+    2. 다양한 맥락에서 통역사 / (3d모델)아바타 / 현실감 있는 생성된 동영상 의 효과성 비교
+
+
+-> 기술적인 발전이 인간을 앞서가는.. 그러한 격차를 해결하는 것이 궁극적인 목표.
 
