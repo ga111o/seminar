@@ -184,9 +184,9 @@ But.. this integral must be consider any combinations of latent variables
 
 -> get ELBO using Jensen's Inequality
 
-<!-- ![옌센?젠센?뭐라고불러야하죠..ipa피셜 덴마크사람이니 /ˈyensənz/이라 불러야 한다네요](./img22_jensen.png)
+![옌센?젠센?뭐라고불러야하죠..ipa피셜 덴마크사람이니 /ˈyensənz/이라 불러야 한다네요](./img22_jensen.png)
 
-Jensen's Inaquality -->
+Jensen's Inaquality
 
 ---
 
